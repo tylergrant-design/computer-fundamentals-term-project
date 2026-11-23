@@ -29,7 +29,25 @@ vector<RegisteredStudent> registered_list;
 void load_class_list();
 void load_registered();
 bool save_registered(RegisteredStudent s);
-bool save_attendance(RegisteredStudent s);
+bool save_attendance(RegisteredStudent s)
+{
+    time_t now = time(nullptr);
+    const tm* today = localtime(&now);
+    cha date[11];
+    if(today == nullptr || strftime(date, sizeof(date), "%Y-%m-%d", today) == 0)
+    {
+        return false;
+    }
+    String filename = string("Attendance_") + date + ".txt";
+    ofstream log(filename,ios::app);
+    if(!log)
+    {
+        return false;
+    }
+    log << student.getBannerNumber() << ", " << date <<'\n';
+    log.close();
+    return !log.fail();
+}
 
 // ========== Set Operating Mode ==========
 bool mode_selection(string selection)
@@ -53,12 +71,32 @@ bool mode_selection(string selection)
 }
 
 // ========== Register Student ==========
-RegResult register_student(string banner, string barcode)
-{
-}
+RegResult register_student(string banner, string barcode);
 
 // ========== Check-in Student ==========
-CheckInResult check_in(string barcode);
+CheckInResult check_in(string barcode)
+{
+    if(current_mode != Mode::Attendance)
+    {
+        return CheckInResult::WrongMode;
+    }
+    if(barcode.empty())
+    {
+        return CheckInResult::BadScan;
+    }
+    for(int i = 0; i < registered_list.size(); i++)
+    {
+        if(RegisteredStudent[i].getBarcode() == barcode)
+        {
+            if(save_attendance(student))
+            {
+                return CheckInResult::Ok;
+            }
+            return CheckInResult::SaveFailed;
+        }
+    }
+    return CheckInResult::NotRegistered;
+}
 
 // ========== Request Attendance ==========
 void request_attendance();
