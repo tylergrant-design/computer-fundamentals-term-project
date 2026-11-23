@@ -32,10 +32,30 @@ bool save_registered(RegisteredStudent s);
 bool save_attendance(RegisteredStudent s);
 
 // ========== Set Operating Mode ==========
-bool mode_selection(string selection);
+bool mode_selection(string selection)
+{
+    if (selection == "Attendance" || selection == "A" || selection == "a" || selection == "attendance") 
+    {
+        current_mode = Mode::Attendance;
+        return true;
+    }
+    if (selection == "Registration" || selection == "R" || selection == "r"|| selection == "registration")
+    {
+        current_mode = Mode::Registration;
+        return true;
+    }
+    if (selection == "Request" || selection == "Q" || selection == "q" || selection == "request")
+    {
+        current_mode = Mode::Request;
+        return true;
+    }
+    return false;
+}
 
 // ========== Register Student ==========
-RegResult register_student(string banner, string barcode);
+RegResult register_student(string banner, string barcode)
+{
+}
 
 // ========== Check-in Student ==========
 CheckInResult check_in(string barcode);
