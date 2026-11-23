@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 #include <ctime>
+#include <boost/algorithm/string.hpp>
+#include <algorithm>
 #include "student.h"
 using namespace std;
 
@@ -41,6 +43,50 @@ CheckInResult check_in(string barcode);
 // ========== Request Attendance ==========
 void request_attendance();
 
+// ========== Helper Functions ==========
+bool is_banner(string s) {
+    if (s.size() != 9) { return false; }
+    if (s[0] != 'B') { return false; }
+    for (int i = 1; i < s.size(); i++) {
+        if (!isdigit(s[i])) { return false; }
+    }
+    return true;
+}
+
+bool is_barcode(string s) {
+    for (int i = 0; i < s.size(); i++) {
+        if (!isdigit(s[i])) { return false; }
+    }
+    return true;
+}
+
+// Binary search in registered_list by banner number
+bool student_found(string banner) {
+    int low = 0;
+    int high = registered_list.size() -1;
+
+    while (low <= high) {
+        int mid = (low + high) / 2;
+        string mid_banner = registered_list[mid].getBanner();
+
+        if (mid_banner == banner) return true;
+        if (mid_banner < banner) low = mid + 1;
+        if (mid_banner > banner) high = mid -1;
+    }
+    return false;
+}
+
+// Insertion sort of registered_list by banner number
+void sort_registered() {
+    for (int i = 1; i < registered_list.size(); i++) {
+        int j = i;
+        while (j > 0 && registered_list[j - 1].getBanner() > registered_list[j].getBanner()) {
+            swap(registered_list[j - 1], registered_list[j]);
+            j--;
+        }
+    }
+}
+
 // ========== Main ==========
 int main() {
     load_class_list();
@@ -48,7 +94,11 @@ int main() {
 
     // get terminal input
     string line;
-    while(getline(cin, line)){
-        // do shit
+    while(cout << "> ", getline(cin, line)) {
+        line = trim(line);
+        if (line.empty()) continue;
+        // handle command
+        // handle barcode
+        else cout << "Unkown input\n";
     }
 }
