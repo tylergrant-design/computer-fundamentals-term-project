@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 #include <ctime>
-#include <boost/algorithm/string.hpp>
+#include <cctype>
 #include "student.h"
 using namespace std;
 
@@ -34,7 +34,6 @@ void load_class_list();
 void load_registered();
 /** 
  * @brief Append another row in registered.csv.
- * Must load_registered() to update the vector array.
  * @param s The student to save.
  * @return false if failed to append.
  */
@@ -59,10 +58,9 @@ bool mode_selection(string selection);
  * @brief Registers a student on the class list.
  * @param s The student to register.
  * @param barcode The scanned barcode.
- * @param current_mode The current mode the program is in.
  * @return RegResult status.
  */
-RegResult register_student(Student s, string barcode, Mode current_mode);
+RegResult register_student(Student s, string barcode);
 
 // ========== Check-in Student ==========
 /**
@@ -115,19 +113,31 @@ bool is_barcode(string s);
  * @param barcode The barcode to search.
  * @returns true if barcode was found.
  */
-bool search_registered_barcode(string barcode);
+bool search_registered(string barcode);
+/**
+ * @brief Binary search in registered_list by barcode.
+ * @param barcode The barcode to search.
+ * @returns pointer to the student, or nullptr if not found.
+ */
+RegisteredStudent* find_registered(string barcode);
 /**
  * @brief Linear search to find banner number.
  * Because we sort by barcode O(n) is best complexity.
  * @param banner The banner number to search.
  * @return true if banner was found.
  */
-bool search_class_list_banner(string banner);
+bool search_class_list(string banner);
 /**
  * @brief Insertion sort of registered_list.
  * Sort by barcode.
  */
 void sort_registered();
+/**
+ * @brief Removes spaces, tabs, and new lines from the front and back of a string.
+ * @param s The string to trim.
+ * @return The trimmed string.
+ */
+string trim(string s);
 
 
 // ========== Main ==========
@@ -143,7 +153,7 @@ int main() {
         if (line.empty()) continue;
         // handle command
         // handle barcode
-        else cout << "Unkown input\n";
+        else cout << "Unknown input\n";
 
         // Notes:
         // must load the new registered file when exiting the registration mode
@@ -164,7 +174,7 @@ void load_class_list() {
         getline(ss, first, ',');
         getline(ss, last, ',');
         getline(ss, banner, ',');
-        class_list.push_back(Student(first, last, banner));
+        class_list.push_back(Student(trim(first), trim(last), trim(banner)));
     }
 }
 void load_registered() {
@@ -180,7 +190,7 @@ void load_registered() {
         getline(ss, last, ',');
         getline(ss, banner, ',');
         getline(ss, barcode, ',');
-        registered_list.push_back(RegisteredStudent(first, last, banner, barcode));
+        registered_list.push_back(RegisteredStudent(trim(first), trim(last), trim(banner), trim(barcode)));
     }
 }
 bool save_registered(RegisteredStudent s) {
@@ -193,20 +203,20 @@ bool save_attendance(RegisteredStudent s)
 {
     time_t now = time(nullptr);
     const tm* today = localtime(&now);
-    cha date[11];
+    char date[11];
     if(today == nullptr || strftime(date, sizeof(date), "%Y-%m-%d", today) == 0)
     {
         return false;
     }
-    String filename = string("Attendance_") + date + ".txt";
-    ofstream log(filename,ios::app);
+    string filename = string("data/Attendance_") + date + ".txt";
+    ofstream log(filename, ios::app);
     if(!log)
     {
         return false;
     }
-    log << student.getBannerNumber() << ", " << date <<'\n';
+    log << s.getBanner() << ", " << date <<'\n';
     log.close();
-    return !log.fail();
+    return log.good();
 }
 
 bool mode_selection(string selection)
@@ -230,45 +240,38 @@ bool mode_selection(string selection)
 }
 
 // ========== Register Student ==========
-RegResult register_student(Student s, string barcode, Mode current_mode) {
+RegResult register_student(Student s, string barcode) {
     // WrongMode error check
     if (current_mode != Mode::Registration) { return RegResult::WrongMode; }
     // NotInClassList error check
-    if (!search_class_list_banner(s.getBanner())) { return RegResult::NotInClassList; }
+    if (!search_class_list(s.getBanner())) { return RegResult::NotInClassList; }
     // AlreadyRegistered error check
-    if (search_registered_barcode(barcode)) { return RegResult::AlreadyRegistered; }
+    if (search_registered(barcode)) { return RegResult::AlreadyRegistered; }
     
     // Append an entry to the registered.csv
     RegisteredStudent newReg(s, barcode);
     // Save and error check
     if (!save_registered(newReg)) { return RegResult::SaveFailed; }
     // Successful registration
+    registered_list.push_back(newReg);
+    sort_registered();
     return RegResult::Ok;
 }
 
 // ========== Check-in Student ==========
 CheckInResult check_in(string barcode)
 {
-    if(current_mode != Mode::Attendance)
-    {
+    if (current_mode != Mode::Attendance) {
         return CheckInResult::WrongMode;
     }
-    if(barcode.empty())
-    {
+    if (!is_barcode(barcode)) {
         return CheckInResult::BadScan;
     }
-    for(int i = 0; i < registered_list.size(); i++)
-    {
-        if(RegisteredStudent[i].getBarcode() == barcode)
-        {
-            if(save_attendance(student))
-            {
-                return CheckInResult::Ok;
-            }
-            return CheckInResult::SaveFailed;
-        }
-    }
-    return CheckInResult::NotRegistered;
+    RegisteredStudent* s = find_registered(barcode);
+    if (s == nullptr) return CheckInResult::NotRegistered;
+    if (save_attendance(*s)) return CheckInResult::Ok;
+    return CheckInResult::SaveFailed;
+
 }
 
 // ========== Request Attendance ==========
@@ -282,43 +285,51 @@ bool compile_DalCard(string path, string* first, string* last, string* banner);
 bool is_banner(string s) {
     if (s.size() != 9) { return false; }
     if (s[0] != 'B') { return false; }
-    for (int i = 1; i < s.size(); i++) {
-        if (!isdigit(s[i])) { return false; }
+    for (size_t i = 1; i < s.size(); i++) {
+        if (!isdigit((unsigned char)s[i])) { return false; }
     }
     return true;
 }
 bool is_barcode(string s) {
-    for (int i = 0; i < s.size(); i++) {
+    if (s.empty()) { return false; }
+    for (size_t i = 0; i < s.size(); i++) {
         if (!isdigit(s[i])) { return false; }
     }
     return true;
 }
-bool search_registered_barcode(string barcode) {
+bool search_registered(string barcode) {
+    return find_registered(barcode) != nullptr;
+}
+RegisteredStudent* find_registered(string barcode) {
     int low = 0;
     int high = (int)registered_list.size() - 1;
-
     while (low <= high) {
         int mid = (low + high) / 2;
-        string mid_banner = registered_list[mid].getBarcode();
-
-        if (mid_banner == barcode) return true;
-        if (mid_banner < barcode) low = mid + 1;
-        if (mid_banner > barcode) high = mid -1;
+        string mid_barcode = registered_list[mid].getBarcode();
+        if (mid_barcode == barcode) return &registered_list[mid];
+        if (mid_barcode < barcode) low = mid + 1;
+        else high = mid - 1;
     }
-    return false;
+    return nullptr;
 }
-bool search_class_list_banner(string banner) {
-    for (int i = 0; i < class_list.size(); i++) {
+bool search_class_list(string banner) {
+    for (size_t i = 0; i < class_list.size(); i++) {
         if (banner == class_list[i].getBanner()) return true;
     }
     return false;
 }
 void sort_registered() {
-    for (int i = 1; i < registered_list.size(); i++) {
+    for (size_t i = 1; i < registered_list.size(); i++) {
         int j = i;
         while (j > 0 && registered_list[j - 1].getBarcode() > registered_list[j].getBarcode()) {
             swap(registered_list[j - 1], registered_list[j]);
             j--;
         }
     }
+}
+string trim(string s) {
+    size_t start = s.find_first_not_of(" \t\r\n");
+    if (start == string::npos) return "";
+    size_t end = s.find_first_not_of(" \t\r\n");
+    return s.substr(start, end - start + 1);
 }
