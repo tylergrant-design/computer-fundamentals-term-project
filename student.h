@@ -1,6 +1,3 @@
-// Tyler Grant B01097745
-// Brady Buffet B01000126
-
 #pragma once
 
 #include <string>
