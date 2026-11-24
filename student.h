@@ -3,9 +3,7 @@
 
 #pragma once
 
-#include <iostream>
 #include <string>
-#include <vector>
 using std::string;
 
 class Student {
@@ -13,16 +11,14 @@ class Student {
         string first;
         string last;
         string banner;
-        static int count;
     
     public:
         Student(string first, string last, string banner) : 
-            first(first), last(last), banner(banner) { count++; }
+            first(first), last(last), banner(banner) {}
 
         string getFirst() const { return first; }
         string getLast() const { return last; }
         string getBanner() const { return banner; }
-        int getCount() { return count; }
 
         virtual string toCsv() const { return first + "," + last + "," + banner; }
         virtual ~Student() = default;
@@ -31,22 +27,17 @@ class Student {
 class RegisteredStudent : public Student {
     private:
         string barcode;
-        static int count;
     
     public:
         // Register Student from scratch
         RegisteredStudent(string first, string last, string banner, string barcode) :
-            Student(first, last, banner), barcode(barcode) { count++; }
+            Student(first, last, banner), barcode(barcode) {}
         
         // Register Student in class_list
         RegisteredStudent(const Student& s, string barcode) :
             Student(s), barcode(barcode) {}
         
         string getBarcode() const { return barcode; }
-        int getCount() { return count; }
 
-        string toCsv() const { return Student::toCsv() + "," + barcode; }
+        string toCsv() const override { return Student::toCsv() + "," + barcode; }
 };
-
-int Student::count = 0;
-int RegisteredStudent::count = 0;

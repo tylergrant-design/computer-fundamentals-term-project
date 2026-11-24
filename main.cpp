@@ -1,7 +1,6 @@
 // Tyler Grant B01097745
 // Brady Buffet B01000126
 
-// Start coding brainstorm
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -9,7 +8,6 @@
 #include <vector>
 #include <ctime>
 #include <boost/algorithm/string.hpp>
-#include <algorithm>
 #include "student.h"
 using namespace std;
 
@@ -26,28 +24,44 @@ vector<RegisteredStudent> registered_list;
 // Attendance log tbd
 
 // ========== Load/Save Files ==========
-void load_class_list();
-void load_registered();
-bool save_registered(RegisteredStudent s);
-bool save_attendance(RegisteredStudent s)
-{
-    time_t now = time(nullptr);
-    const tm* today = localtime(&now);
-    cha date[11];
-    if(today == nullptr || strftime(date, sizeof(date), "%Y-%m-%d", today) == 0)
-    {
-        return false;
+void load_class_list() {
+    ifstream file("data/class_list.csv");
+    if (!file) { cout << "Cannot open class_list.csv\n"; return; }
+
+    string line;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+        stringstream ss(line);
+        string first, last, banner;
+        getline(ss, first, ',');
+        getline(ss, last, ',');
+        getline(ss, banner, ',');
+        class_list.push_back(Student(first, last, banner));
     }
-    String filename = string("Attendance_") + date + ".txt";
-    ofstream log(filename,ios::app);
-    if(!log)
-    {
-        return false;
-    }
-    log << student.getBannerNumber() << ", " << date <<'\n';
-    log.close();
-    return !log.fail();
 }
+void load_registered() {
+    ifstream file("data/registered.csv");
+    if (!file) { cout << "Cannot open registered.csv\n"; return; }
+
+    string line;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+        stringstream ss(line);
+        string first, last, banner, barcode;
+        getline(ss, first, ',');
+        getline(ss, last, ',');
+        getline(ss, banner, ',');
+        getline(ss, barcode, ',');
+        registered_list.push_back(RegisteredStudent(first, last, banner, barcode));
+    }
+}
+bool save_registered(RegisteredStudent s) {
+    ofstream file("data/registered.csv");
+    if (!file) { return false; }
+    file << s.toCsv() << "\n";
+    return file.good();
+}
+bool save_attendance(RegisteredStudent s);
 
 // ========== Set Operating Mode ==========
 bool mode_selection(string selection)
@@ -71,7 +85,21 @@ bool mode_selection(string selection)
 }
 
 // ========== Register Student ==========
-RegResult register_student(string banner, string barcode);
+RegResult register_student(Student s, string barcode, Mode current_mode) {
+    // WrongMode error check
+    if (current_mode != Mode::Registration) { return RegResult::WrongMode; }
+    // NotInClassList error check
+    if (!search_class_list_banner(s.getBanner())) { return RegResult::NotInClassList; }
+    // AlreadyRegistered error check
+    if (search_registered_barcode(barcode)) { return RegResult::AlreadyRegistered; }
+    
+    // Append an entry to the registered.csv
+    RegisteredStudent newReg(s, barcode);
+    // Save and error check
+    if (!save_registered(newReg)) { return RegResult::SaveFailed; }
+    // Successful registration
+    return RegResult::Ok;
+}
 
 // ========== Check-in Student ==========
 CheckInResult check_in(string barcode)
@@ -101,6 +129,10 @@ CheckInResult check_in(string barcode)
 // ========== Request Attendance ==========
 void request_attendance();
 
+// ========== Capture ==========
+Student compile_DalCard();
+void capture();
+
 // ========== Helper Functions ==========
 bool is_banner(string s) {
     if (s.size() != 9) { return false; }
@@ -110,35 +142,39 @@ bool is_banner(string s) {
     }
     return true;
 }
-
 bool is_barcode(string s) {
     for (int i = 0; i < s.size(); i++) {
         if (!isdigit(s[i])) { return false; }
     }
     return true;
 }
-
-// Binary search in registered_list by banner number
-bool student_found(string banner) {
+// Binary search in registered_list by barcode
+bool search_registered_barcode(string barcode) {
     int low = 0;
-    int high = registered_list.size() -1;
+    int high = (int)registered_list.size() - 1;
 
     while (low <= high) {
         int mid = (low + high) / 2;
-        string mid_banner = registered_list[mid].getBanner();
+        string mid_banner = registered_list[mid].getBarcode();
 
-        if (mid_banner == banner) return true;
-        if (mid_banner < banner) low = mid + 1;
-        if (mid_banner > banner) high = mid -1;
+        if (mid_banner == barcode) return true;
+        if (mid_banner < barcode) low = mid + 1;
+        if (mid_banner > barcode) high = mid -1;
     }
     return false;
 }
-
-// Insertion sort of registered_list by banner number
+// Linear search to find banner number, because we sort by barcode O(n) is best
+bool search_class_list_banner(string banner) {
+    for (int i = 0; i < class_list.size(); i++) {
+        if (banner == class_list[i].getBanner()) return true;
+    }
+    return false;
+}
+// Insertion sort of registered_list by barcode
 void sort_registered() {
     for (int i = 1; i < registered_list.size(); i++) {
         int j = i;
-        while (j > 0 && registered_list[j - 1].getBanner() > registered_list[j].getBanner()) {
+        while (j > 0 && registered_list[j - 1].getBarcode() > registered_list[j].getBarcode()) {
             swap(registered_list[j - 1], registered_list[j]);
             j--;
         }
@@ -149,6 +185,7 @@ void sort_registered() {
 int main() {
     load_class_list();
     load_registered();
+    sort_registered();
 
     // get terminal input
     string line;
@@ -158,5 +195,10 @@ int main() {
         // handle command
         // handle barcode
         else cout << "Unkown input\n";
+
+        // Notes:
+        // must load the new registered file when exiting the registration mode
+        // barcode when a terminal line starts with isdigit(line[0])
+        // must validate barcode
     }
 }
