@@ -24,6 +24,134 @@ vector<RegisteredStudent> registered_list;
 // Attendance log tbd
 
 // ========== Load/Save Files ==========
+/**
+ * @brief Load class_list.csv into a vector array.
+*/
+void load_class_list();
+/** 
+ * @brief Load registered.csv into a vector array.
+*/
+void load_registered();
+/** 
+ * @brief Append another row in registered.csv.
+ * Must load_registered() to update the vector array.
+ * @param s The student to save.
+ * @return false if failed to append.
+ */
+bool save_registered(RegisteredStudent s);
+/**
+ * @brief Append a registered student to the attendance log.
+ * @param s The student to save.
+ * @return false if failed to append.
+ */
+bool save_attendance(RegisteredStudent s);
+
+// ========== Set Operating Mode ==========
+/**
+ * @brief Updates current_mode.
+ * @param selection The desired mode.
+ * @return false if selection is not in Mode.
+ */
+bool mode_selection(string selection);
+
+// ========== Register Student ==========
+/**
+ * @brief Registers a student on the class list.
+ * @param s The student to register.
+ * @param barcode The scanned barcode.
+ * @param current_mode The current mode the program is in.
+ * @return RegResult status.
+ */
+RegResult register_student(Student s, string barcode, Mode current_mode);
+
+// ========== Check-in Student ==========
+/**
+ * @brief Logs the attendance of a student who scanned their barcode.
+ * Student must be registered.
+ * @param barcode The scanned barcode.
+ * @return CheckInResult status.
+ */
+CheckInResult check_in(string barcode);
+
+// ========== Request Attendance ==========
+/**
+ * @brief Request the attendance log.
+ */
+void request_attendance();
+
+// ========== Capture ==========
+/**
+ * @brief Open camera, show live preview.
+ * SPACE to save the photo. ESC to cancel.
+ * @param path The path to the image.
+ * @returns true if a photo was saved.
+*/
+bool capture(string path);
+/**
+ * @brief Read the photo and extract first, last, and banner.
+ * @param path The path to the image.
+ * @param first Saves first name.
+ * @param last Saves last name.
+ * @param banner Saves banner number.
+ * @return true if all 3 are set.
+*/
+bool compile_DalCard(string path, string* first, string* last, string* banner);
+
+// ========== Helper Functions ==========
+/**
+ * @brief Checks to see if a string is a valid banner number.
+ * @param s The string to check.
+ * @return true if banner number.
+ */
+bool is_banner(string s);
+/**
+ * @brief Checks to see is a string is a valid barcode.
+ * @param s The string to check.
+ * @return true if barcode.
+ */
+bool is_barcode(string s);
+/**
+ * @brief Binary search in registered_list by barcode.
+ * @param barcode The barcode to search.
+ * @returns true if barcode was found.
+ */
+bool search_registered_barcode(string barcode);
+/**
+ * @brief Linear search to find banner number.
+ * Because we sort by barcode O(n) is best complexity.
+ * @param banner The banner number to search.
+ * @return true if banner was found.
+ */
+bool search_class_list_banner(string banner);
+/**
+ * @brief Insertion sort of registered_list.
+ * Sort by barcode.
+ */
+void sort_registered();
+
+
+// ========== Main ==========
+int main() {
+    load_class_list();
+    load_registered();
+    sort_registered();
+
+    // get terminal input
+    string line;
+    while(cout << "> ", getline(cin, line)) {
+        line = trim(line);
+        if (line.empty()) continue;
+        // handle command
+        // handle barcode
+        else cout << "Unkown input\n";
+
+        // Notes:
+        // must load the new registered file when exiting the registration mode
+        // barcode when a terminal line starts with isdigit(line[0])
+        // must validate barcode
+    }
+}
+// ========== Save/Load Files ==========
 void load_class_list() {
     ifstream file("data/class_list.csv");
     if (!file) { cout << "Cannot open class_list.csv\n"; return; }
@@ -56,14 +184,31 @@ void load_registered() {
     }
 }
 bool save_registered(RegisteredStudent s) {
-    ofstream file("data/registered.csv");
+    ofstream file("data/registered.csv", ios::app);
     if (!file) { return false; }
     file << s.toCsv() << "\n";
     return file.good();
 }
-bool save_attendance(RegisteredStudent s);
+bool save_attendance(RegisteredStudent s)
+{
+    time_t now = time(nullptr);
+    const tm* today = localtime(&now);
+    cha date[11];
+    if(today == nullptr || strftime(date, sizeof(date), "%Y-%m-%d", today) == 0)
+    {
+        return false;
+    }
+    String filename = string("Attendance_") + date + ".txt";
+    ofstream log(filename,ios::app);
+    if(!log)
+    {
+        return false;
+    }
+    log << student.getBannerNumber() << ", " << date <<'\n';
+    log.close();
+    return !log.fail();
+}
 
-// ========== Set Operating Mode ==========
 bool mode_selection(string selection)
 {
     if (selection == "Attendance" || selection == "A" || selection == "a" || selection == "attendance") 
@@ -130,8 +275,8 @@ CheckInResult check_in(string barcode)
 void request_attendance();
 
 // ========== Capture ==========
-Student compile_DalCard();
-void capture();
+bool capture(string path);
+bool compile_DalCard(string path, string* first, string* last, string* banner);
 
 // ========== Helper Functions ==========
 bool is_banner(string s) {
@@ -148,7 +293,6 @@ bool is_barcode(string s) {
     }
     return true;
 }
-// Binary search in registered_list by barcode
 bool search_registered_barcode(string barcode) {
     int low = 0;
     int high = (int)registered_list.size() - 1;
@@ -163,14 +307,12 @@ bool search_registered_barcode(string barcode) {
     }
     return false;
 }
-// Linear search to find banner number, because we sort by barcode O(n) is best
 bool search_class_list_banner(string banner) {
     for (int i = 0; i < class_list.size(); i++) {
         if (banner == class_list[i].getBanner()) return true;
     }
     return false;
 }
-// Insertion sort of registered_list by barcode
 void sort_registered() {
     for (int i = 1; i < registered_list.size(); i++) {
         int j = i;
@@ -178,27 +320,5 @@ void sort_registered() {
             swap(registered_list[j - 1], registered_list[j]);
             j--;
         }
-    }
-}
-
-// ========== Main ==========
-int main() {
-    load_class_list();
-    load_registered();
-    sort_registered();
-
-    // get terminal input
-    string line;
-    while(cout << "> ", getline(cin, line)) {
-        line = trim(line);
-        if (line.empty()) continue;
-        // handle command
-        // handle barcode
-        else cout << "Unkown input\n";
-
-        // Notes:
-        // must load the new registered file when exiting the registration mode
-        // barcode when a terminal line starts with isdigit(line[0])
-        // must validate barcode
     }
 }
